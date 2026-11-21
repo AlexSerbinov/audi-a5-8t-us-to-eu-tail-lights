@@ -1,24 +1,33 @@
 # Audi A5 8T facelift: US → EU tail lights
 
-Wiring and module 46 coding for fitting European LED tail lights to a US-market Audi A5 (8T facelift, B8.5), so the car gets amber rear turn signals and a rear fog light.
+Notes on fitting European LED tail lights to a US-market Audi A5 (8T facelift, B8.5): wiring, the module 46 channel map, and why adaptation coding alone did not hold on this car.
 
 ![Brake lights after the conversion](img/03-brake-after.jpg)
 
-## Short version
+## Status: the coding does not survive a restart on this module
 
-1. Fit the EU lamps. Splice the EU connector pigtails onto the car harness, colour to colour. No new wires were needed on this car.
-2. In module 46 (Central Convenience, J393), Security Access `16017`, change eight adaptation channels:
+**Do not copy the values below onto a facelift car and call it done.** They made every lamp work correctly in the garage, but the module rejected them at its next restart.
 
-| Channel (left / right) | US value | EU value |
+What happened on this car (module 46, `8K0 907 064 KM`, BCM2 2.0, H15 0711):
+
+- With the eight channels changed, the lights worked as intended until the module restarted (ignition off, bus asleep, ignition on).
+- After the restart the module logged `03389 - Data Set Implausible`, lit the bulb warning in the cluster and fell back to a built-in failsafe light set. In that state brake and turn share the same LEDs again, as on US coding.
+- The fault cannot be cleared while the changed values are stored.
+- Five different sets were tried. Each one failed after a restart, including a set with a single channel changed to a value that the neighbouring channel already uses (197: `6 → 134`). The untouched factory set passes.
+- Restoring every channel to its factory value and restarting the module removes the fault.
+
+Conclusion: this module version checks the whole light data set against something like a checksum. Editing the light channels through adaptation (VCDS, OBDeleven and similar tools) is not enough. The data set has to be written as a whole by a tool that also writes a valid signature: ODIS parametrisation, VCP with the matching data set, or a coding dongle sold with the adapter looms. Older BCM2 versions (pre-facelift cars) appear not to have this check, which is why many forum guides work there.
+
+The channel map and the function codes below are still correct and useful for understanding the module. The car is currently back on factory values.
+
+### The values that were tested
+
+| Channel (left / right) | US value (factory) | EU value tested |
 |---|---|---|
-| 195 / 196 | 134 / 166 | **132 / 164** |
-| 197 / 198 | 6 / 38 | **4 / 36** |
-| 199 / 200 | 6 / 38 | **12 / 44** |
-| 201 / 202 | 134 / 166 | **140 / 172** |
-
-3. Check tail, brake, turn, hazards, rear fog and reverse before you drive.
-
-> **About accuracy.** The table above is exactly what is stored in this car now, read back from the module after the last write. The descriptions of what each channel drives, the worked examples and the photos come from testing on one car with a phone camera, so details there may be imprecise. Read and save your own values before you change anything.
+| 195 / 196 | 134 / 166 | 132 / 164 (also 4 / 36) |
+| 197 / 198 | 6 / 38 | 4 / 36 |
+| 199 / 200 | 6 / 38 | 12 / 44 |
+| 201 / 202 | 134 / 166 | 140 / 172 (also 12 / 44) |
 
 ## Contents
 
@@ -27,7 +36,7 @@ Wiring and module 46 coding for fitting European LED tail lights to a US-market 
 - [Wiring](#wiring)
 - [Coding](#coding)
 - [Worked example: one channel, start to finish](#worked-example-one-channel-start-to-finish)
-- [Result](#result)
+- [Result](#result) (as seen before the restart)
 - [How the values were found](#how-the-values-were-found)
 - [What went wrong](#what-went-wrong)
 - [Sources](#sources)
@@ -121,6 +130,8 @@ If a test value does something wrong, read the channel again. The test value is 
 
 ## Result
 
+These photos show the lights with the tested values, before the module restarted and rejected them.
+
 | Function | Outer lamp (fender) | Inner lamp (trunk lid) |
 |---|---|---|
 | Tail | red strip | red strip |
@@ -164,7 +175,9 @@ Forum threads for this conversion give values for other cars or other lamp gener
 
 - **The camera lies about LED colour.** In video frames the red brake LEDs and the amber strip looked the same, and two wrong conclusions came from that. Full-resolution stills cropped to each lamp fixed it: the LED groups sit in different places, so position tells them apart even when colour does not.
 - **Low battery voltage breaks the session.** With the ignition and lights on for a long time the battery fell to 10.8 V. The diagnostic adapter dropped off USB and the module stopped answering. Run the engine or connect a charger.
-- **A batch script wrote values to the wrong channels.** After a dropped connection the tool no longer accepted the typed channel number, and a scripted "type channel, type value, save" wrote garbage into about fifteen channels, including the tail light ones. The backup restored all of them. Write one channel at a time and check the channel number and stored value on screen after each write.
+- **The module overwrote about twenty channels by itself.** After the first restart with changed values, channels 195–212 and the service channels 213, 214 and 230–245 held different numbers (for example 199–202 = `10248 / 10280`, 212 = `15`, 213 = `12336`, 230–237 = `2771, 2772, 2901, 2902, 3532, 3533, 3554, 3555`). This was first blamed on a scripted write. It is the module's failsafe set: a [Ross-Tech thread](https://forums.ross-tech.com/index.php?threads/9240/) shows the same numbers on another car. All of them must be restored from the backup, not only the light channels, or `03389` stays.
+- **Scripted clicking in the diagnostic tool is risky.** A click sequence that assumed the wrong screen opened a different module. Check the screen after every step.
+- **The first read after opening the adaptation screen can show a stale value.** Read the channel a second time before trusting it.
 - **Brake lights need the ignition on.** With the ignition off they stay dark, which looks exactly like a coding fault.
 
 ## Sources
